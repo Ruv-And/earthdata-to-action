@@ -1,0 +1,20 @@
+{
+  "name": "Air Quality Forecast Dashboard",
+  "short_name": "Air Quality",
+  "description": "Get personalized air quality forecasts and alerts",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#3b82f6",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "any",
+      "type": "image/x-icon"
+    }
+  ],
+  "categories": ["weather", "health", "environment"],
+  "lang": "en-US",
+  "dir": "ltr"
+}

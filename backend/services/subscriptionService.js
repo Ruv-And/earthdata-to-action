@@ -7,16 +7,17 @@ export class SubscriptionService {
     sessionToken,
     latitude,
     longitude,
-    notificationsEnabled
+    notificationsEnabled,
+    pushSubscription = null
   ) {
     const tokenHash = await bcrypt.hash(sessionToken, 10);
     
     const result = await pool.query(
       `INSERT INTO subscriptions 
-       (session_token_hash, latitude, longitude, notifications_enabled)
-       VALUES ($1, $2, $3, $4)
+       (session_token_hash, latitude, longitude, notifications_enabled, push_subscription)
+       VALUES ($1, $2, $3, $4, $5)
        RETURNING id`,
-      [tokenHash, latitude, longitude, notificationsEnabled]
+      [tokenHash, latitude, longitude, notificationsEnabled, pushSubscription]
     );
     
     return result.rows[0];
@@ -29,6 +30,21 @@ export class SubscriptionService {
     );
     
     return result.rows[0] || null;
+  }
+
+  static async findBySessionToken(sessionToken) {
+    const result = await pool.query(
+      'SELECT * FROM subscriptions'
+    );
+    
+    // Compare with each hashed token
+    for (const row of result.rows) {
+      if (await bcrypt.compare(sessionToken, row.session_token_hash)) {
+        return row;
+      }
+    }
+    
+    return null;
   }
 
   static async update(
@@ -51,6 +67,10 @@ export class SubscriptionService {
       fields.push(`longitude = $${paramCount++}`);
       values.push(updates.longitude);
     }
+    if (updates.pushSubscription !== undefined) {
+      fields.push(`push_subscription = $${paramCount++}`);
+      values.push(updates.pushSubscription);
+    }
 
     values.push(id);
 
@@ -68,7 +88,7 @@ export class SubscriptionService {
 
   static async getActiveSubscriptions() {
     const result = await pool.query(
-      `SELECT id, latitude, longitude, last_notification_sent
+      `SELECT id, latitude, longitude, last_notification_sent, push_subscription, notifications_enabled
        FROM subscriptions
        WHERE notifications_enabled = true`
     );

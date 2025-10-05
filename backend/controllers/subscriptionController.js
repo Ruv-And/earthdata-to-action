@@ -1,10 +1,46 @@
 // src/controllers/subscription.controller.js
 import { SubscriptionService } from '../services/subscriptionService.js';
+import { PushNotificationService } from '../services/pushNotificationService.js';
 
 export class SubscriptionController {
+  static async checkStatus(req, res) {
+    try {
+      const { sessionToken } = req.body;
+
+      const subscription = await SubscriptionService.findBySessionToken(sessionToken);
+
+      if (!subscription) {
+        return res.json({
+          success: true,
+          subscribed: false,
+          subscription: null
+        });
+      }
+
+      res.json({
+        success: true,
+        subscribed: true,
+        subscription: {
+          id: subscription.id,
+          latitude: subscription.latitude,
+          longitude: subscription.longitude,
+          notificationsEnabled: subscription.notifications_enabled,
+          lastNotificationSent: subscription.last_notification_sent,
+          hasPushSubscription: !!subscription.push_subscription
+        }
+      });
+    } catch (error) {
+      console.error('Check status error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error'
+      });
+    }
+  }
+
   static async subscribe(req, res) {
     try {
-      const { sessionToken, latitude, longitude, notificationsEnabled } = req.body;
+      const { sessionToken, latitude, longitude, notificationsEnabled, pushSubscription } = req.body;
 
       if (!notificationsEnabled) {
         return res.status(400).json({
@@ -17,13 +53,15 @@ export class SubscriptionController {
         sessionToken,
         latitude,
         longitude,
-        notificationsEnabled
+        notificationsEnabled,
+        pushSubscription ? JSON.stringify(pushSubscription) : null
       );
 
       res.status(201).json({
         success: true,
         message: 'Successfully subscribed to air quality notifications',
-        subscriptionId: subscription.id
+        subscriptionId: subscription.id,
+        vapidPublicKey: PushNotificationService.getVapidPublicKey()
       });
     } catch (error) {
       console.error('Subscribe error:', error);
@@ -37,7 +75,7 @@ export class SubscriptionController {
   static async update(req, res) {
     try {
       const { id } = req.params;
-      const { sessionToken, notificationsEnabled, latitude, longitude } = req.body;
+      const { sessionToken, notificationsEnabled, latitude, longitude, pushSubscription } = req.body;
 
       // Verify token
       const isValid = await SubscriptionService.verifyToken(id, sessionToken);
@@ -52,7 +90,8 @@ export class SubscriptionController {
       await SubscriptionService.update(id, {
         notificationsEnabled,
         latitude,
-        longitude
+        longitude,
+        pushSubscription: pushSubscription ? JSON.stringify(pushSubscription) : undefined
       });
 
       res.json({
@@ -108,6 +147,45 @@ export class SubscriptionController {
       });
     } catch (error) {
       console.error('Get all error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error'
+      });
+    }
+  }
+
+  static async getVapidKey(req, res) {
+    try {
+      res.json({
+        success: true,
+        publicKey: PushNotificationService.getVapidPublicKey()
+      });
+    } catch (error) {
+      console.error('Get VAPID key error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error'
+      });
+    }
+  }
+
+  static async testNotification(req, res) {
+    try {
+      const { title = 'Test Notification', body = 'This is a test push notification!' } = req.body;
+      
+      const successCount = await PushNotificationService.broadcastAirQualityAlert(
+        title,
+        body,
+        { test: true }
+      );
+
+      res.json({
+        success: true,
+        message: `Test notification sent to ${successCount} subscribers`,
+        sentCount: successCount
+      });
+    } catch (error) {
+      console.error('Test notification error:', error);
       res.status(500).json({
         success: false,
         message: 'Internal server error'
