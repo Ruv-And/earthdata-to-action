@@ -94,53 +94,44 @@ self.addEventListener('push', (event) => {
   );
 });
 
-// Notification click event
 self.addEventListener('notificationclick', (event) => {
   console.log('Notification clicked:', event);
   
   event.notification.close();
   
   if (event.action === 'view' || !event.action) {
-    // Open the app
     event.waitUntil(
       clients.matchAll({ type: 'window', includeUncontrolled: true })
         .then((clientList) => {
-          // Check if app is already open
           for (const client of clientList) {
             if (client.url.includes(self.location.origin) && 'focus' in client) {
               return client.focus();
             }
           }
-          // Open new window if app is not open
           if (clients.openWindow) {
             return clients.openWindow(event.notification.data?.url || '/');
           }
         })
     );
   } else if (event.action === 'dismiss') {
-    // Just close the notification (already done above)
     console.log('Notification dismissed');
   }
 });
 
-// Background sync for offline functionality (optional)
 self.addEventListener('sync', (event) => {
   console.log('Background sync event:', event);
   
   if (event.tag === 'background-sync') {
     event.waitUntil(
-      // Handle background sync tasks
       console.log('Performing background sync...')
     );
   }
 });
 
-// Handle push subscription changes
 self.addEventListener('pushsubscriptionchange', (event) => {
   console.log('Push subscription changed:', event);
   
   event.waitUntil(
-    // Re-subscribe with the new subscription
     self.registration.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(
@@ -148,7 +139,6 @@ self.addEventListener('pushsubscriptionchange', (event) => {
       )
     }).then((subscription) => {
       console.log('New subscription:', subscription);
-      // Send new subscription to server
       return fetch('/api/update-push-subscription', {
         method: 'POST',
         headers: {
@@ -162,7 +152,6 @@ self.addEventListener('pushsubscriptionchange', (event) => {
   );
 });
 
-// Helper function to convert VAPID key
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - base64String.length % 4) % 4);
   const base64 = (base64String + padding)
